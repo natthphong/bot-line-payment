@@ -5,12 +5,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/google/uuid"
 	"github.com/line/line-bot-sdk-go/v8/linebot/messaging_api"
+	"github.com/natthphong/bot-line-payment/auth"
 	"github.com/natthphong/bot-line-payment/config"
 	"github.com/natthphong/bot-line-payment/internal/db"
+	"github.com/natthphong/bot-line-payment/internal/httputil"
 	"github.com/natthphong/bot-line-payment/internal/logz"
-	"github.com/natthphong/bot-line-payment/model"
+	"github.com/natthphong/bot-line-payment/internal/s3util"
 	"github.com/omise/omise-go"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -53,7 +56,19 @@ func main() {
 	logger.Info("DB CONNECT")
 
 	// tune perfomance with appCache
-
+	httpClient := httputil.InitHttpClient(
+		cfg.HTTP.TimeOut,
+		cfg.HTTP.MaxIdleConn,
+		cfg.HTTP.MaxIdleConnPerHost,
+		cfg.HTTP.MaxConnPerHost,
+	)
+	_ = httpClient
+	svc, err := s3util.OpenS3(cfg.AwsS3Config)
+	if err != nil {
+		panic(err)
+	}
+	_ = svc
+	logger.Info("S3 CONNECT")
 	baanBot, err := messaging_api.NewMessagingApiAPI(
 		cfg.LineConfig["baan-bot"].ChannelToken,
 	)
@@ -63,28 +78,18 @@ func main() {
 
 	_ = baanBot
 
-	//userTestId := "U5df59f9c7f4fe1f0cb97a1177324be88"
-	//response, err := line_message.SendMessage(baanBot)([]messaging_api.MessageInterface{
-	//	messaging_api.TextMessage{
-	//		Text: "Hello, world" + time.Now().Format("2006-01-02 15:04:05"),
-	//	},
-	//}, userTestId, uuid.NewString(), true,
-	//)
-	//if err != nil {
-	//	return
-	//}
-
 	logger.Info("line CONNECT")
 
-	client, e := omise.NewClient(cfg.OmiseConfig.PublicKey, cfg.OmiseConfig.SecretKey)
-	if e != nil {
-		log.Fatal(e)
-	}
-
-	_ = client
-	logger.Info("omise CONNECT")
-	// คิดเงิน
-	//source, err := payment.CreateSource(client)(2000, "",
+	//client, e := omise.NewClient(cfg.OmiseConfig.PublicKey, cfg.OmiseConfig.SecretKey)
+	//if e != nil {
+	//	log.Fatal(e)
+	//}
+	//
+	//_ = client
+	//logger.Info("omise CONNECT")
+	//// คิดเงิน
+	//////TODO insert txn
+	//source, err := payment.CreateSource(client)(2000, "IOS",
 	//	"promptpay",
 	//	"thb",
 	//	uuid.NewString(),
@@ -101,9 +106,55 @@ func main() {
 	//	panic(err)
 	//	return
 	//}
-	//fmt.Println("charge:", charge)
-	// คิดเงิน
+	////fmt.Println("charge:", charge)
+	////url := "https://api.omise.co/charges/chrg_test_6161p4jhaa9civutsl5/documents/docu_test_6161p4lyiyf3izc7x9y/downloads/6384C3AE0D9127A4"
+	//url := charge.Source.ScannableCode.Image.DownloadURI
+	//fmt.Println(url)
 
+	//file, err := httputil.DownloadFile(httpClient, url)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//keyFile := fmt.Sprintf("%s/%s", *charge.Source.ScannableCode.Image.Location, charge.Source.ScannableCode.Image.Filename)
+	//exp := time.Now().Add(time.Minute * 1)
+	//_, err = svc.PutObject(&s3.PutObjectInput{
+	//	Expires:     &exp,
+	//	Bucket:      aws.String(cfg.AwsS3Config.BucketName),
+	//	Key:         aws.String(keyFile),
+	//	Body:        bytes.NewReader(file), // Convert byte array to io.Reader
+	//	ContentType: aws.String("image/svg+xml"),
+	//	ACL:         aws.String("private"), // Set the file access permissions (private, public-read, etc.)
+	//})
+	//if err != nil {
+	//	panic(err)
+	//}
+	//request, _ := svc.GetObjectRequest(&s3.GetObjectInput{
+	//	Bucket: aws.String(cfg.AwsS3Config.BucketName),
+	//	Key:    aws.String(keyFile),
+	//})
+	//
+	//urlPresign, err := request.Presign(10 * time.Minute)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//fmt.Println(urlPresign)
+	////คิดเงิน
+
+	//userTestId := "U5df59f9c7f4fe1f0cb97a1177324be88"
+	//
+	//_, err = line_message.SendMessage(baanBot)([]messaging_api.MessageInterface{
+	//	messaging_api.ImageCarouselTemplate{},
+	//	messaging_api.ImageMessage{
+	//		OriginalContentUrl: "https://fastly.picsum.photos/id/237/200/300.jpg?hmac=TmmQSbShHz9CdQm0NkEjx1Dyh_Y984R9LpNrpvH2D_U",
+	//		PreviewImageUrl:    "https://fastly.picsum.photos/id/237/200/300.jpg?hmac=TmmQSbShHz9CdQm0NkEjx1Dyh_Y984R9LpNrpvH2D_U",
+	//	},
+	//}, userTestId, uuid.NewString(), true,
+	//)
+	//if err != nil {
+	//	return
+	//}
+
+	// TODO end test
 	//app.Post("/line/event/hook", func(c *fiber.Ctx) error {
 	//	cb, err := webhook.ParseRequest(os.Getenv("LINE_CHANNEL_SECRET"))
 	//	if err != nil {
@@ -117,7 +168,8 @@ func main() {
 	//)
 
 	app.Post("/omise/event/hook", func(c *fiber.Ctx) error {
-		var req model.Event
+		// insert finish txn
+		var req omise.Charge
 		err := c.BodyParser(&req)
 		if err != nil {
 			return err
@@ -129,6 +181,12 @@ func main() {
 		})
 	},
 	)
+
+	group := app.Group("/api/v1")
+	group.Post("/login/line", auth.LoginHandler(
+		cfg.LineLoginClientId,
+		auth.InsertAndMergeUserLineLogin(dbPool),
+	))
 
 	if err = app.Listen(fmt.Sprintf(":%v", cfg.Server.Port)); err != nil {
 		logger.Fatal(err.Error())
@@ -151,7 +209,7 @@ func initFiber() *fiber.App {
 			StrictRouting:         true,
 		},
 	)
-	//app.Use(fiber.co)
+	app.Use(cors.New())
 	app.Use(SetHeaderID())
 	return app
 }

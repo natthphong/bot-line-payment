@@ -10,13 +10,23 @@ import (
 )
 
 type Config struct {
-	Env         string
-	EnableS3    bool
-	Server      Server
-	Log         LogConfig
-	DBConfig    DBConfig
-	LineConfig  map[string]LineConfig
-	OmiseConfig OmiseConfig
+	Env               string
+	EnableS3          bool
+	Server            Server
+	Log               LogConfig
+	DBConfig          DBConfig
+	LineConfig        map[string]LineConfig
+	OmiseConfig       OmiseConfig
+	HTTP              HTTP
+	AwsS3Config       AwsS3Config
+	LineLoginClientId string
+}
+type AwsS3Config struct {
+	DoSpaceEndpoint string
+	DoSpaceRegion   string
+	AccessKey       string
+	SecretKey       string
+	BucketName      string
 }
 type OmiseConfig struct {
 	PublicKey string
@@ -51,8 +61,6 @@ type HTTP struct {
 	MaxIdleConn        int
 	MaxIdleConnPerHost int
 	MaxConnPerHost     int
-	CertFile           []byte
-	KeyFile            []byte
 }
 
 func InitConfig() (*Config, error) {
