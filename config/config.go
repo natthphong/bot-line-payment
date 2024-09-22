@@ -10,12 +10,17 @@ import (
 )
 
 type Config struct {
-	Env        string
-	EnableS3   bool
-	Server     Server
-	Log        LogConfig
-	DBConfig   DBConfig
-	LineConfig map[string]LineConfig
+	Env         string
+	EnableS3    bool
+	Server      Server
+	Log         LogConfig
+	DBConfig    DBConfig
+	LineConfig  map[string]LineConfig
+	OmiseConfig OmiseConfig
+}
+type OmiseConfig struct {
+	PublicKey string
+	SecretKey string
 }
 type LineConfig struct {
 	ChannelSecret string

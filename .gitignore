@@ -22,9 +22,11 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
-
+*.sql
 # Go workspace file
 go.work
+sql
+frontend
 config/config.yaml
 ### Go Patch ###
 /vendor/
