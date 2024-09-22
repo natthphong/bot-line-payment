@@ -198,7 +198,7 @@ func main() {
 		}
 		return api.Ok(ctx, body)
 	})
-	groupAuth.Post("/branch/list", user.BranchListHandler())
+	groupAuth.Post("/branch/list", user.BranchListHandler(user.GetListBranches(dbPool)))
 	groupAuth.Post("/category/list", user.CategoryListHandler())
 	groupAuth.Post("/product/list", user.ProductListHandler())
 

@@ -1,15 +1,19 @@
 package user
 
 import (
+	"context"
 	"github.com/gofiber/fiber/v2"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/natthphong/bot-line-payment/api"
+	"github.com/natthphong/bot-line-payment/internal/logz"
+	"go.uber.org/zap"
 )
 
 type BranchListRequest struct {
 	Page        int    `json:"page"`
 	Size        int    `json:"size"`
 	CompanyCode string `json:"companyCode"`
-	Internal    bool   `json:"internal"`
+	Internal    string `json:"internal"`
 }
 
 type BranchObject struct {
@@ -26,36 +30,62 @@ type BranchListResponse struct {
 	} `json:"message"`
 }
 
-func BranchListHandler() fiber.Handler {
+func BranchListHandler(
+	getListBranchesFunc GetListBranchesFunc,
+) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-
+		logger := logz.NewLogger()
 		var req BranchListRequest
 		if err := c.BodyParser(&req); err != nil {
 			return api.BadRequest(c, "Invalid request format")
 		}
-
+		list, total, err := getListBranchesFunc(c.Context(), logger, req)
+		if err != nil {
+			return api.InternalError(c, err.Error())
+		}
 		resp := BranchListResponse{
-			TotalCount: 10,
+			TotalCount: total,
 			Message: struct {
 				Branches []BranchObject `json:"branches"`
 			}{
-				Branches: []BranchObject{
-					{
-						BranchName:        "Branch 1",
-						BranchDescription: "Description 1",
-						BranchCode:        "B001",
-						InActive:          "N",
-					},
-					{
-						BranchName:        "Branch 2",
-						BranchDescription: "Description 2",
-						BranchCode:        "B002",
-						InActive:          "Y",
-					},
-				},
+				Branches: list,
 			},
 		}
 
 		return api.Ok(c, &resp)
+	}
+}
+
+type GetListBranchesFunc func(ctx context.Context, logger *zap.Logger, req BranchListRequest) (resp []BranchObject, total int, err error)
+
+func GetListBranches(db *pgxpool.Pool) GetListBranchesFunc {
+	return func(ctx context.Context, logger *zap.Logger, req BranchListRequest) (resp []BranchObject, total int, err error) {
+		countSql := `SELECT COUNT(*) FROM tbl_company_branch tcb where (tcb.company_code='' or tcb.company_code=$1) and (tcb.internal='' or tcb.internal=$2)`
+		err = db.QueryRow(ctx, countSql, req.CompanyCode, req.Internal).Scan(&total)
+		if err != nil {
+			return nil, 0, err
+		}
+		sql := `
+			select tcb.branch_code, tcb.branch_name, tcb.branch_description, tcb.in_active 
+			from tbl_company_branch  tcb
+			where (tcb.company_code=$1 or tcb.company_code=$1) 
+			  and tcb.is_deleted='N' 
+			  and (tcb.internal=$2 or tcb.internal=$2)
+			offset $3 limit $4;
+			`
+		rows, err := db.Query(ctx, sql, req.CompanyCode, req.Internal, req.Page, req.Size)
+		if err != nil {
+			return nil, 0, err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var temp BranchObject
+			err = rows.Scan(&temp.BranchCode, &temp.BranchName, &temp.BranchDescription, &temp.InActive)
+			if err != nil {
+				return nil, 0, err
+			}
+			resp = append(resp, temp)
+		}
+		return resp, total, err
 	}
 }
