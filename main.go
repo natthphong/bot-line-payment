@@ -11,6 +11,7 @@ import (
 	"github.com/natthphong/bot-line-payment/api"
 	"github.com/natthphong/bot-line-payment/config"
 	"github.com/natthphong/bot-line-payment/handler/auth"
+	"github.com/natthphong/bot-line-payment/handler/user"
 	"github.com/natthphong/bot-line-payment/internal/db"
 	"github.com/natthphong/bot-line-payment/internal/httputil"
 	"github.com/natthphong/bot-line-payment/internal/logz"
@@ -197,6 +198,9 @@ func main() {
 		}
 		return api.Ok(ctx, body)
 	})
+	groupAuth.Post("/branch/list", user.BranchListHandler())
+	groupAuth.Post("/category/list", user.CategoryListHandler())
+	groupAuth.Post("/product/list", user.ProductListHandler())
 
 	if err = app.Listen(fmt.Sprintf(":%v", cfg.Server.Port)); err != nil {
 		logger.Fatal(err.Error())
