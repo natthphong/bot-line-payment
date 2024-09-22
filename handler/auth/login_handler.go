@@ -14,7 +14,6 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
-	"time"
 )
 
 type LineErrorResponse struct {
@@ -58,12 +57,11 @@ func LoginHandler(
 
 		}
 
-		err = insertAndMergeUserLineLoginFunc(c.Context(), logger, lineResponse)
+		err = insertAndMergeUserLineLoginFunc(c.Context(), logger, lineResponse, req.IDToken)
 		if err != nil {
 			return api.InternalError(c, "DB Error")
 
 		}
-		fmt.Println(lineResponse.Exp > time.Now().Unix())
 		return api.Ok(c, lineResponse)
 	}
 }
@@ -98,10 +96,10 @@ func verifyIDToken(idToken, clientID string) ([]byte, error) {
 	return body, nil
 }
 
-type InsertAndMergeUserLineLoginFunc func(ctx context.Context, logger *zap.Logger, lineResponse LineResponse) error
+type InsertAndMergeUserLineLoginFunc func(ctx context.Context, logger *zap.Logger, lineResponse LineResponse, token string) error
 
 func InsertAndMergeUserLineLogin(db *pgxpool.Pool) InsertAndMergeUserLineLoginFunc {
-	return func(ctx context.Context, logger *zap.Logger, lineResponse LineResponse) error {
+	return func(ctx context.Context, logger *zap.Logger, lineResponse LineResponse, token string) error {
 
 		query := `
 			INSERT INTO tbl_line_user (
@@ -122,7 +120,7 @@ func InsertAndMergeUserLineLogin(db *pgxpool.Pool) InsertAndMergeUserLineLoginFu
 			lineResponse.Sub,
 			lineResponse.Aud,
 			lineResponse.Name,
-			lineResponse.Sub,
+			token,
 			lineResponse.Picture,
 			lineResponse.Exp,
 		)

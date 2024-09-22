@@ -8,12 +8,14 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/google/uuid"
 	"github.com/line/line-bot-sdk-go/v8/linebot/messaging_api"
+	"github.com/natthphong/bot-line-payment/api"
 	"github.com/natthphong/bot-line-payment/config"
 	"github.com/natthphong/bot-line-payment/handler/auth"
 	"github.com/natthphong/bot-line-payment/internal/db"
 	"github.com/natthphong/bot-line-payment/internal/httputil"
 	"github.com/natthphong/bot-line-payment/internal/logz"
 	"github.com/natthphong/bot-line-payment/internal/s3util"
+	"github.com/natthphong/bot-line-payment/middleware"
 	"github.com/omise/omise-go"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -187,6 +189,14 @@ func main() {
 		cfg.LineLoginClientId,
 		auth.InsertAndMergeUserLineLogin(dbPool),
 	))
+	groupAuth := group.Group("/auth")
+	groupAuth.Get("/me", func(ctx *fiber.Ctx) error {
+		body, err := middleware.JwtTokenGetUser(dbPool)(ctx, logger)
+		if err != nil {
+			return api.JwtError(ctx, err.Error())
+		}
+		return api.Ok(ctx, body)
+	})
 
 	if err = app.Listen(fmt.Sprintf(":%v", cfg.Server.Port)); err != nil {
 		logger.Fatal(err.Error())

@@ -25,6 +25,18 @@ func Err(code string, message string) Response {
 		Message: message,
 	}
 }
+func JwtError(c *fiber.Ctx, message string) error {
+	if message == "Token Not Found" {
+		return c.Status(fiber.StatusUnauthorized).JSON(Err("452", message))
+	} else if message == "Logout Already" {
+		return c.Status(fiber.StatusUnauthorized).JSON(Err("453", message))
+	} else if message == "Token Expired" {
+		return c.Status(fiber.StatusUnauthorized).JSON(Err("454", message))
+	} else {
+		return c.Status(fiber.StatusInternalServerError).JSON(Err("401", message))
+	}
+
+}
 
 func Unauthorized(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusUnauthorized).JSON(Err("401", fiber.ErrUnauthorized.Error()))
