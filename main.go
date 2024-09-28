@@ -47,7 +47,7 @@ func main() {
 	ctx, cancel = context.WithCancel(ctx)
 	defer cancel()
 	logger := zap.L()
-
+	logger.Info("version 0.0.3")
 	jsonCfg, err := json.Marshal(cfg)
 	_ = jsonCfg
 	logger.Debug("after cfg : " + string(jsonCfg))
@@ -185,7 +185,7 @@ func main() {
 	},
 	)
 
-	group := app.Group("/api/v1")
+	group := app.Group("/baan/api/v1")
 	group.Post("/login/line", auth.LoginHandler(
 		cfg.LineLoginClientId,
 		auth.InsertAndMergeUserLineLogin(dbPool),
@@ -198,9 +198,18 @@ func main() {
 		}
 		return api.Ok(ctx, body)
 	})
-	groupAuth.Post("/branch/list", user.BranchListHandler(user.GetListBranches(dbPool)))
-	groupAuth.Post("/category/list", user.CategoryListHandler())
-	groupAuth.Post("/product/list", user.ProductListHandler())
+	groupAuth.Post("/branch/list", user.BranchListHandler(
+		middleware.JwtTokenGetUser(dbPool),
+		user.GetListBranches(dbPool),
+	))
+	groupAuth.Post("/category/list", user.CategoryListHandler(
+		middleware.JwtTokenGetUser(dbPool),
+		user.FindAllCategory(dbPool),
+	))
+	groupAuth.Post("/product/list", user.ProductListHandler(
+		middleware.JwtTokenGetUser(dbPool),
+		user.FindAllProduct(dbPool),
+	))
 
 	if err = app.Listen(fmt.Sprintf(":%v", cfg.Server.Port)); err != nil {
 		logger.Fatal(err.Error())
@@ -223,7 +232,7 @@ func initFiber() *fiber.App {
 			StrictRouting:         true,
 		},
 	)
-	app.Use(cors.New())
+	app.Use(cors.New(cors.ConfigDefault))
 	app.Use(SetHeaderID())
 	return app
 }
